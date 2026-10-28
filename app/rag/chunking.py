@@ -1,8 +1,10 @@
 """Split markdown documents into structure-aware, token-sized chunks for retrieval."""
 
+import hashlib
 import math
 import re  # regular expressions like #
 import unicodedata
+from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,13 +16,16 @@ FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 SENTENCE_END_RE = re.compile(r"(?<=[.!?।෴])\s+")
 WHITESPACE_RE = re.compile(r"\s+")
 NEWLINE_RE = re.compile(r"\n")
-SUPPORTED_SUFFIXES = {".md", ".txt"}
 
 # Embedding models such as multilingual-e5 stop at 512 tokens; 400 leaves headroom for the
 # approximate counter being off and for the model's own prefix and special tokens.
 DEFAULT_MAX_TOKENS = 400
 DEFAULT_OVERLAP_TOKENS = 50
 DEFAULT_MIN_TOKENS = 50
+
+# Bump whenever a code change would cut the same text differently (new splitter, parser fix...),
+# so that already-ingested chunks are seen as stale even though no setting changed.
+CHUNKER_VERSION = 1
 
 BlockKind = Literal["prose", "code", "table"]
 Splitters = list[tuple[re.Pattern[str], str]]
@@ -52,6 +57,9 @@ class Chunk:
     text: str
     source: str
     section: str
+    chunk_index: int  # position in the document, for ordering and showing neighbours
+    token_count: int
+    doc_hash: str  # same for every chunk of a document; changes when any part of it changes
 
 
 @dataclass(frozen=True)
@@ -67,6 +75,26 @@ class _Draft:
     section_index: int  # parts of the same section share this, so we never merge them back
 
 
+def chunk_id(source: str, text: str, occurrence: int = 0) -> str:
+    """An ID that depends only on what the chunk says, not where it sits in the document.
+
+    Editing one paragraph changes only that chunk's ID, so ingestion can re-embed just that
+    chunk instead of everything after it. The source is part of the key so the same text in
+    two documents stays two chunks, and deleting one document never removes the other's.
+    """
+    return _short_hash(f"{source}\x00{occurrence}\x00{text}")
+
+
+def document_hash(text: str) -> str:
+    """Fingerprint of a whole (normalized) document, so ingestion can skip files that did not change."""
+    return _short_hash(text)
+
+
+def _short_hash(text: str) -> str:
+    # 128 bits: collisions are not a practical concern even across millions of chunks.
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+
+
 def normalize_text(text: str) -> str:
     """NFC so the same Sinhala letter always has the same code points; unify line endings."""
     text = text.removeprefix("﻿").replace("\r\n", "\n").replace("\r", "\n")
@@ -80,6 +108,7 @@ class MarkdownChunker:
         max_tokens: int = DEFAULT_MAX_TOKENS,
         overlap_tokens: int = DEFAULT_OVERLAP_TOKENS,
         min_tokens: int = DEFAULT_MIN_TOKENS,
+        tokenizer_name: str | None = None,
     ) -> None:
         if max_tokens < 1:
             raise ValueError("max_tokens must be at least 1")
@@ -91,8 +120,27 @@ class MarkdownChunker:
         self.max_tokens = max_tokens
         self.overlap_tokens = overlap_tokens
         self.min_tokens = min_tokens
+        # Lambdas and partials all look alike by name, so callers can pass a clearer one.
+        self.tokenizer_name = tokenizer_name or (
+            f"{getattr(count_tokens, '__module__', '?')}.{getattr(count_tokens, '__qualname__', '?')}"
+        )
+
+    @property
+    def fingerprint(self) -> str:
+        """Changes whenever this chunker would cut the same document differently.
+
+        Ingestion stores it next to each document's doc_hash: if either one differs from what
+        is stored, that document is re-chunked; if both match, it is skipped.
+        """
+        settings = (
+            f"v{CHUNKER_VERSION}|{self.tokenizer_name}"
+            f"|max={self.max_tokens}|overlap={self.overlap_tokens}|min={self.min_tokens}"
+        )
+        return _short_hash(settings)
 
     def chunk(self, text: str, source: str) -> list[Chunk]:
+        text = normalize_text(text)
+        doc_hash = document_hash(text)
         # Documents without headings (plain text, PDFs) fall back to the file name as the label.
         fallback = _title_from_filename(source)
         drafts = [
@@ -100,15 +148,23 @@ class MarkdownChunker:
             for index, (headings, blocks) in enumerate(_parse_sections(text))
             for draft in self._section_drafts(headings, blocks, index, fallback)
         ]
-        return [
-            Chunk(
-                id=f"{source}#{i}",
-                text=draft.text,
-                source=source,
-                section=" > ".join(draft.headings) or fallback,
+        # How many times each text has appeared so far, so repeated chunks still get distinct IDs.
+        seen: Counter[str] = Counter()
+        chunks: list[Chunk] = []
+        for index, draft in enumerate(self._merge_small(drafts)):
+            chunks.append(
+                Chunk(
+                    id=chunk_id(source, draft.text, seen[draft.text]),
+                    text=draft.text,
+                    source=source,
+                    section=" > ".join(draft.headings) or fallback,
+                    chunk_index=index,
+                    token_count=self.count(draft.text),
+                    doc_hash=doc_hash,
+                )
             )
-            for i, draft in enumerate(self._merge_small(drafts))
-        ]
+            seen[draft.text] += 1
+        return chunks
 
     def _section_drafts(
         self, headings: tuple[str, ...], blocks: list[_Block], index: int, fallback: str
@@ -237,17 +293,9 @@ class MarkdownChunker:
         return ""
 
 
-def chunk_directory(directory: Path, chunker: MarkdownChunker | None = None) -> list[Chunk]:
-    chunker = chunker or MarkdownChunker()
-    chunks: list[Chunk] = []
-    paths = sorted(p for p in directory.iterdir() if p.suffix in SUPPORTED_SUFFIXES)
-    for path in paths:
-        chunks.extend(chunker.chunk(path.read_text(encoding="utf-8"), source=path.name))
-    return chunks
-
-
 def _parse_sections(text: str) -> Iterator[tuple[tuple[str, ...], list[_Block]]]:
-    """Yield (heading path, blocks) for every heading section that has content."""
+    """Yield (heading path, blocks) for every heading section that has content.
+    Expects text that has already been through normalize_text."""
     headings: list[str] = []
     blocks: list[_Block] = []
     lines: list[str] = []
@@ -261,7 +309,7 @@ def _parse_sections(text: str) -> Iterator[tuple[tuple[str, ...], list[_Block]]]
                 kind = "table"
             blocks.append(_Block(content, kind))
 
-    for line in normalize_text(text).split("\n"):
+    for line in text.split("\n"):
         if fence:
             lines.append(line)
             if _closes_fence(line, fence):

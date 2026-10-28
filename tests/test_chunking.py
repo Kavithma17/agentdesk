@@ -1,12 +1,9 @@
 import unicodedata
 from itertools import pairwise
-from pathlib import Path
 
 import pytest
 
-from app.rag.chunking import MarkdownChunker, approx_token_count, chunk_directory
-
-DOCS_DIR = Path(__file__).parent.parent / "data" / "docs"
+from app.rag.chunking import MarkdownChunker, approx_token_count
 
 
 def make_chunker(**overrides) -> MarkdownChunker:
@@ -167,6 +164,97 @@ def test_parts_of_one_split_section_are_not_merged_back():
     assert [body(c) for c in chunks] == ["a" * 95, "b" * 5]
 
 
+# --- stable ids ------------------------------------------------------------------------------
+
+
+def test_ids_are_the_same_on_every_run():
+    md = "# A\n\nAlpha.\n\n# B\n\nBeta."
+    first = [c.id for c in make_chunker().chunk(md, source="x.md")]
+    second = [c.id for c in make_chunker().chunk(md, source="x.md")]
+    assert first == second
+
+
+def test_adding_a_section_does_not_change_other_ids():
+    before = make_chunker().chunk("# A\n\nAlpha.\n\n# B\n\nBeta.", source="x.md")
+    after = make_chunker().chunk("# New\n\nFresh.\n\n# A\n\nAlpha.\n\n# B\n\nBeta.", source="x.md")
+    assert {c.id for c in before} < {c.id for c in after}
+
+
+def test_editing_a_section_changes_only_its_id():
+    before = make_chunker().chunk("# A\n\nAlpha.\n\n# B\n\nBeta.", source="x.md")
+    after = make_chunker().chunk("# A\n\nAlpha.\n\n# B\n\nBeta, edited.", source="x.md")
+    assert before[0].id == after[0].id
+    assert before[1].id != after[1].id
+
+
+def test_repeated_text_gets_distinct_ids():
+    md = "# A\n\nSame.\n\n# B\n\nOther.\n\n# A\n\nSame."
+    chunks = make_chunker().chunk(md, source="x.md")
+    assert chunks[0].text == chunks[2].text
+    assert len({c.id for c in chunks}) == 3
+
+
+def test_same_text_in_two_documents_gets_distinct_ids():
+    [a] = make_chunker().chunk("# Contact\n\nCall 011.", source="faq.md")
+    [b] = make_chunker().chunk("# Contact\n\nCall 011.", source="returns.md")
+    assert a.id != b.id
+
+
+def test_line_endings_do_not_change_ids():
+    # The same file checked out on Windows (CRLF) and Linux (LF) must give the same IDs.
+    [lf] = make_chunker().chunk("# A\n\nAlpha.", source="x.md")
+    [crlf] = make_chunker().chunk("# A\r\n\r\nAlpha.", source="x.md")
+    assert lf.id == crlf.id
+
+
+# --- metadata --------------------------------------------------------------------------------
+
+
+def test_chunks_carry_index_and_token_count():
+    chunks = make_chunker().chunk("# A\n\nAlpha.\n\n# B\n\nBeta.", source="x.md")
+    assert [c.chunk_index for c in chunks] == [0, 1]
+    assert all(c.token_count == len(c.text) for c in chunks)  # make_chunker counts characters
+
+
+def test_all_chunks_of_a_document_share_its_hash():
+    chunks = make_chunker().chunk("# A\n\nAlpha.\n\n# B\n\nBeta.", source="x.md")
+    assert len({c.doc_hash for c in chunks}) == 1
+
+
+def test_doc_hash_changes_when_any_part_changes():
+    [before, _] = make_chunker().chunk("# A\n\nAlpha.\n\n# B\n\nBeta.", source="x.md")
+    [after, _] = make_chunker().chunk("# A\n\nAlpha.\n\n# B\n\nBeta, edited.", source="x.md")
+    assert before.id == after.id  # this chunk did not change...
+    assert before.doc_hash != after.doc_hash  # ...but the document did
+
+
+def test_doc_hash_ignores_line_endings():
+    [lf] = make_chunker().chunk("# A\n\nAlpha.", source="x.md")
+    [crlf] = make_chunker().chunk("# A\r\n\r\nAlpha.", source="x.md")
+    assert lf.doc_hash == crlf.doc_hash
+
+
+# --- chunker fingerprint ---------------------------------------------------------------------
+
+
+def test_fingerprint_is_stable_for_the_same_settings():
+    assert make_chunker().fingerprint == make_chunker().fingerprint
+
+
+@pytest.mark.parametrize(
+    "change",
+    [{"max_tokens": 1000}, {"overlap_tokens": 10}, {"min_tokens": 10}, {"count_tokens": str.count}],
+)
+def test_fingerprint_changes_with_any_setting(change):
+    assert make_chunker(**change).fingerprint != make_chunker().fingerprint
+
+
+def test_explicit_tokenizer_name_tells_lambdas_apart():
+    a = make_chunker(count_tokens=lambda t: len(t), tokenizer_name="chars")
+    b = make_chunker(count_tokens=lambda t: len(t) // 2, tokenizer_name="half-chars")
+    assert a.fingerprint != b.fingerprint
+
+
 # --- config and real data --------------------------------------------------------------------
 
 
@@ -181,17 +269,3 @@ def test_invalid_settings_are_rejected(settings):
 
 def test_approx_count_is_higher_for_sinhala_than_english_of_same_length():
     assert approx_token_count("ක" * 40) > approx_token_count("a" * 40)
-
-
-def test_real_docs_chunk_cleanly():
-    chunker = MarkdownChunker()
-    chunks = chunk_directory(DOCS_DIR, chunker)
-    assert {c.source for c in chunks} == {
-        "delivery_policy.md",
-        "returns_policy.md",
-        "products.md",
-        "faq.md",
-    }
-    assert len({c.id for c in chunks}) == len(chunks)
-    assert all(approx_token_count(c.text) <= chunker.max_tokens for c in chunks)
-    assert any("Kandy" in c.text and "450" in c.text for c in chunks)

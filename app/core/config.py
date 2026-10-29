@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     llm_model: str = "gemini-3.5-flash"
     log_level: str = "INFO"
 
+    embedding_provider: Literal["gemini"] = "gemini"
+    embedding_model: str = "gemini-embedding-2"
+    # Changing either of these makes the stored vectors unusable: everything must be re-embedded.
+    embedding_dim: int = Field(768, gt=0)
+
     docs_dir: Path = Path("data/docs")
     chunk_max_tokens: int = Field(DEFAULT_MAX_TOKENS, gt=0)
     chunk_overlap_tokens: int = Field(DEFAULT_OVERLAP_TOKENS, ge=0)

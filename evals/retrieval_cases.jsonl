@@ -1,0 +1,28 @@
+{"id": "en-01", "lang": "en", "query": "How much does delivery to Kandy cost?", "relevant": ["Kandy, Galle, Kurunegala", "මහනුවර, ගාල්ල"]}
+{"id": "en-02", "lang": "en", "query": "When is delivery free?", "relevant": ["Free delivery", "නොමිලේ බෙදාහැරීම"]}
+{"id": "en-03", "lang": "en", "query": "Can I pay cash on delivery for a Rs. 60,000 order?", "relevant": ["Cash on delivery is available for orders up to Rs. 50,000", "Cash on delivery (for orders up to Rs. 50,000)"]}
+{"id": "en-04", "lang": "en", "query": "If I order at 4 PM, when will it be shipped?", "relevant": ["Orders placed after 2:00 PM"]}
+{"id": "en-05", "lang": "en", "query": "Can I return earbuds I already opened because I don't like them?", "relevant": ["Opened items cannot be returned"]}
+{"id": "en-06", "lang": "en", "query": "How long does a refund take?", "relevant": ["5–7 working days"]}
+{"id": "en-07", "lang": "en", "query": "Can I swim with the Nova Watch Fit?", "relevant": ["5 ATM"]}
+{"id": "en-08", "lang": "en", "query": "Can I take the 20000 mAh power bank on a flight?", "relevant": ["airline cabin baggage"]}
+{"id": "en-09", "lang": "en", "query": "What are your customer support hours?", "relevant": ["Monday to Saturday, 9:00 AM to 6:00 PM", "සඳුදා සිට සෙනසුරාදා"]}
+{"id": "en-10", "lang": "en", "query": "Do you have a shop I can visit?", "relevant": ["We are online only"]}
+{"id": "si-01", "lang": "si", "query": "මහනුවරට බෙදාහැරීමේ ගාස්තුව කීයද?", "relevant": ["මහනුවර, ගාල්ල", "Kandy, Galle, Kurunegala"]}
+{"id": "si-02", "lang": "si", "query": "මගේ ඇණවුම අවලංගු කරන්න පුළුවන්ද?", "relevant": ["before it is dispatched"]}
+{"id": "si-03", "lang": "si", "query": "ගෙවන්න පුළුවන් ක්‍රම මොනවාද?", "relevant": ["Visa, Mastercard", "බැංකු මාරු කිරීම්"]}
+{"id": "si-04", "lang": "si", "query": "සල්ලි ආපසු ලැබෙන්න කොච්චර කල් යනවද?", "relevant": ["5–7 working days"]}
+{"id": "si-05", "lang": "si", "query": "වයර්ලස් ඉයර්බඩ්ස් වල මිල කීයද?", "relevant": ["Rs. 8,500"]}
+{"id": "si-06", "lang": "si", "query": "කැඩුණු භාණ්ඩයක් ලැබුණොත් මොකද කරන්නේ?", "relevant": ["defective on arrival"]}
+{"id": "si-07", "lang": "si", "query": "යාපනයට ඩිලිවරි කරන්න කීයක් යනවද?", "relevant": ["Jaffna, Trincomalee", "උතුරු සහ නැගෙනහිර"]}
+{"id": "si-08", "lang": "si", "query": "ඔයාලා වැඩ කරන වෙලාවන් මොනවාද?", "relevant": ["සඳුදා සිට සෙනසුරාදා", "Monday to Saturday, 9:00 AM to 6:00 PM"]}
+{"id": "sg-01", "lang": "singlish", "query": "kandy walata delivery kiyada?", "relevant": ["Kandy, Galle, Kurunegala", "මහනුවර, ගාල්ල"]}
+{"id": "sg-02", "lang": "singlish", "query": "order eka cancel karanna puluwanda?", "relevant": ["before it is dispatched"]}
+{"id": "sg-03", "lang": "singlish", "query": "earbuds open kala passe return karanna puluwanda?", "relevant": ["Opened items cannot be returned"]}
+{"id": "sg-04", "lang": "singlish", "query": "refund eka enna kochchara kal yanawada?", "relevant": ["5–7 working days"]}
+{"id": "sg-05", "lang": "singlish", "query": "watch eka dagena swim karanna puluwanda?", "relevant": ["5 ATM"]}
+{"id": "sg-06", "lang": "singlish", "query": "cash on delivery thiyenawada?", "relevant": ["Cash on delivery is available for orders up to Rs. 50,000", "Cash on delivery (for orders up to Rs. 50,000)"]}
+{"id": "sg-07", "lang": "singlish", "query": "mage order eka track karanne kohomada?", "relevant": ["tracking number", "ට්‍රැකින් අංකයක්"]}
+{"id": "sg-08", "lang": "singlish", "query": "speaker eka wathure watunoth narak wenawada?", "relevant": ["IPX7"]}
+{"id": "sg-09", "lang": "singlish", "query": "rs 15000 ta wada gaththoth delivery free da?", "relevant": ["Free delivery", "නොමිලේ බෙදාහැරීම"]}
+{"id": "sg-10", "lang": "singlish", "query": "products original da?", "relevant": ["official warranty"]}

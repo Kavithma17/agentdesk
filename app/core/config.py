@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Changing either of these makes the stored vectors unusable: everything must be re-embedded.
     embedding_dim: int = Field(768, gt=0)
 
+    vector_store_dir: Path = Path("data/chroma")
+    vector_collection: str = "knowledge_base"
+
     docs_dir: Path = Path("data/docs")
     chunk_max_tokens: int = Field(DEFAULT_MAX_TOKENS, gt=0)
     chunk_overlap_tokens: int = Field(DEFAULT_OVERLAP_TOKENS, ge=0)
